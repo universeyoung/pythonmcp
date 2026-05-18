@@ -32,25 +32,25 @@ def create_server() -> Server:
 
 async def serve_sse(host: str, port: int):
     from starlette.applications import Starlette
-    from starlette.routing import Route
+    from starlette.routing import Mount
     import uvicorn
 
     sse = SseServerTransport("/messages/")
 
-    async def handle_sse(request):
+    async def sse_asgi(scope, receive, send):
         async with sse.connect_sse(
-            request.scope, request.receive, request._send
+            scope, receive, send
         ) as (read_stream, write_stream):
             server = create_server()
             await server.run(read_stream, write_stream, server.create_initialization_options())
 
-    async def handle_messages(request):
-        await sse.handle_post_message(request.scope, request.receive, request._send)
+    async def messages_asgi(scope, receive, send):
+        await sse.handle_post_message(scope, receive, send)
 
     app = Starlette(
         routes=[
-            Route("/sse", endpoint=handle_sse),
-            Route("/messages/", endpoint=handle_messages, methods=["POST"]),
+            Mount("/sse", app=sse_asgi),
+            Mount("/messages/", app=messages_asgi),
         ]
     )
 
@@ -62,8 +62,7 @@ async def serve_sse(host: str, port: int):
 
 async def serve_streamable_http(host: str, port: int):
     from starlette.applications import Starlette
-    from starlette.routing import Route
-    from starlette.responses import Response
+    from starlette.routing import Mount
     import uvicorn
 
     server = create_server()
@@ -78,15 +77,13 @@ async def serve_streamable_http(host: str, port: int):
         async with session_manager.run():
             yield
 
-    async def handle_mcp(request):
-        await session_manager.handle_request(
-            request.scope, request.receive, request._send
-        )
+    async def mcp_asgi(scope, receive, send):
+        await session_manager.handle_request(scope, receive, send)
 
     app = Starlette(
         lifespan=lifespan,
         routes=[
-            Route("/mcp", endpoint=handle_mcp, methods=["POST", "GET", "DELETE"]),
+            Mount("/mcp", app=mcp_asgi),
         ],
     )
 
