@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 from . import coderunner
->>>>>>> feat-add-mcp-tools-hKdaHC
 from . import everything
 from . import fetch
 from . import filesystem
@@ -9,11 +6,7 @@ from . import memory
 from . import sequentialthinking
 from . import websearch
 
-<<<<<<< HEAD
-_modules = [everything, fetch, filesystem, memory, sequentialthinking, websearch]
-=======
 _modules = [coderunner, everything, fetch, filesystem, memory, sequentialthinking, websearch]
->>>>>>> feat-add-mcp-tools-hKdaHC
 
 
 def get_all_tools() -> list:
@@ -31,8 +24,4 @@ async def handle_tool(name: str, arguments: dict):
     raise ValueError(f"Unknown tool: {name}")
 
 
-<<<<<<< HEAD
 __all__ = ["get_all_tools", "handle_tool"]
-=======
-__all__ = ["get_all_tools", "handle_tool"]
->>>>>>> feat-add-mcp-tools-hKdaHC
