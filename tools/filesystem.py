@@ -11,7 +11,13 @@ def _get_allowed_directories() -> list[str]:
     dirs = os.environ.get("MCP_ALLOWED_DIRECTORIES", "")
     if dirs:
         return [d.strip() for d in dirs.split(";") if d.strip()]
-    return [str(pathlib.Path.home())]
+    default_dirs = [
+        str(pathlib.Path.home()),
+        r"C:\Users",
+        r"D:\chenqi",
+    ]
+    existing = [d for d in default_dirs if pathlib.Path(d).exists()]
+    return existing if existing else [str(pathlib.Path.home())]
 
 
 def _validate_path(requested_path: str, allowed_dirs: list[str]) -> pathlib.Path:

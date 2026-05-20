@@ -1,6 +1,9 @@
 import asyncio
 import tempfile
 import uuid
+import os
+import sys
+import shutil
 from typing import Sequence
 
 from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
@@ -49,33 +52,35 @@ async def handle_tool(name: str, arguments: dict) -> Sequence[TextContent | Imag
 async def _run_python_code(arguments: dict) -> Sequence[TextContent]:
     args = RunCodeInput(**arguments)
     
+    python_exe = sys.executable
+    if not python_exe or not os.path.exists(python_exe):
+        python_exe = "python"
+    
     temp_file = None
     try:
         temp_id = uuid.uuid4().hex[:8]
-        temp_file = tempfile.NamedTemporaryFile(
-            mode='w', 
-            suffix=f'_{temp_id}.py', 
-            delete=False, 
-            encoding='utf-8'
-        )
-        temp_file.write(args.code)
-        temp_file.close()
+        temp_dir = tempfile.gettempdir()
+        temp_file = os.path.join(temp_dir, f"mcp_code_{temp_id}.py")
         
-        process = await asyncio.create_subprocess_exec(
-            'python', temp_file.name,
+        with open(temp_file, 'w', encoding='utf-8') as f:
+            f.write(args.code)
+        
+        proc = await asyncio.create_subprocess_exec(
+            python_exe, temp_file,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            text=True
+            stderr=asyncio.subprocess.PIPE
         )
         
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), 
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), 
                 timeout=args.timeout
             )
+            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ""
+            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ""
         except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
+            proc.kill()
+            await proc.wait()
             return [
                 TextContent(
                     type="text",
@@ -94,9 +99,9 @@ async def _run_python_code(arguments: dict) -> Sequence[TextContent]:
         if not output_parts:
             output_parts.append("(No output produced)")
         
-        output_parts.append(f"\n[Exit code: {process.returncode}]")
+        output_parts.append(f"\n[Exit code: {proc.returncode}]")
         
-        return [TextContent(type="text", text="\n".join(output_parts))]
+        return [TextContent(type="text", text="".join(output_parts))]
     
     except FileNotFoundError:
         return [
@@ -113,36 +118,36 @@ async def _run_python_code(arguments: dict) -> Sequence[TextContent]:
             )
         ]
     finally:
-        if temp_file:
-            import os
+        if temp_file and os.path.exists(temp_file):
             try:
-                os.unlink(temp_file.name)
+                os.unlink(temp_file)
             except:
                 pass
 
 
 async def _run_shell_command(arguments: dict) -> Sequence[TextContent]:
     args = RunShellInput(**arguments)
+    command = args.command
     
-    shell_cmd = 'cmd.exe'
-    shell_args = ['/c', args.command]
+    is_windows = sys.platform == 'win32'
     
     try:
-        process = await asyncio.create_subprocess_exec(
-            shell_cmd, *shell_args,
+        proc = await asyncio.create_subprocess_shell(
+            command,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            text=True
+            stderr=asyncio.subprocess.PIPE
         )
         
         try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(), 
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), 
                 timeout=args.timeout
             )
+            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ""
+            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ""
         except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
+            proc.kill()
+            await proc.wait()
             return [
                 TextContent(
                     type="text",
@@ -161,9 +166,9 @@ async def _run_shell_command(arguments: dict) -> Sequence[TextContent]:
         if not output_parts:
             output_parts.append("(No output produced)")
         
-        output_parts.append(f"\n[Exit code: {process.returncode}]")
+        output_parts.append(f"\n[Exit code: {proc.returncode}]")
         
-        return [TextContent(type="text", text="\n".join(output_parts))]
+        return [TextContent(type="text", text="".join(output_parts))]
     
     except Exception as e:
         return [
