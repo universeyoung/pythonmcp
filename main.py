@@ -19,13 +19,22 @@ from tools import get_all_tools, handle_tool
 
 logger = logging.getLogger(__name__)
 
+_cached_tools: list[Tool] | None = None
+
+
+def get_cached_tools() -> list[Tool]:
+    global _cached_tools
+    if _cached_tools is None:
+        _cached_tools = get_all_tools()
+    return _cached_tools
+
 
 def create_server() -> Server:
     server = Server("pythonmcp")
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return get_all_tools()
+        return get_cached_tools()
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
@@ -75,6 +84,7 @@ async def serve_streamable_http(host: str, port: int):
         app=server,
         json_response=True,
         stateless=False,
+        request_timeout=300,
     )
 
     @contextlib.asynccontextmanager
@@ -92,8 +102,16 @@ async def serve_streamable_http(host: str, port: int):
         ],
     )
 
-    # 新增 log_config=None
-    config = uvicorn.Config(app, host=host, port=port, log_level="info", use_colors=False, log_config=None)
+    config = uvicorn.Config(
+        app, 
+        host=host, 
+        port=port, 
+        log_level="info", 
+        use_colors=False, 
+        log_config=None,
+        timeout_keep_alive=60,
+        limit_concurrency=100,
+    )
     http_server = uvicorn.Server(config)
     logger.info(f"Streamable HTTP server listening on http://{host}:{port}/mcp")
     await http_server.serve()
@@ -144,6 +162,10 @@ def main():
     )
 
     logger.info(f"Starting PythonMCP server with transport: {args.transport}")
+    
+    logger.info("Pre-loading tools...")
+    tools = get_cached_tools()
+    logger.info(f"Loaded {len(tools)} tools")
 
     if args.transport == "sse":
         asyncio.run(serve_sse(args.host, args.port))

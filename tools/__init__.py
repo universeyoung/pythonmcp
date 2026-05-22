@@ -8,12 +8,16 @@ from . import websearch
 
 _modules = [coderunner, everything, fetch, filesystem, memory, sequentialthinking, websearch]
 
+_cached_tools: list | None = None
+
 
 def get_all_tools() -> list:
-    tools = []
-    for module in _modules:
-        tools.extend(module.get_tools())
-    return tools
+    global _cached_tools
+    if _cached_tools is None:
+        _cached_tools = []
+        for module in _modules:
+            _cached_tools.extend(module.get_tools())
+    return _cached_tools
 
 
 async def handle_tool(name: str, arguments: dict):
