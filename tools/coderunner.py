@@ -131,11 +131,16 @@ async def _run_shell_command(arguments: dict) -> Sequence[TextContent]:
     
     is_windows = sys.platform == 'win32'
     
+    env = os.environ.copy()
+    env['PYTHONIOENCODING'] = 'utf-8'
+    
     try:
         proc = await asyncio.create_subprocess_shell(
             command,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+            cwd=os.getcwd()
         )
         
         try:
@@ -143,8 +148,19 @@ async def _run_shell_command(arguments: dict) -> Sequence[TextContent]:
                 proc.communicate(), 
                 timeout=args.timeout
             )
-            stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ""
-            stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ""
+            
+            if is_windows:
+                try:
+                    stdout = stdout_bytes.decode('gbk', errors='replace')
+                except:
+                    stdout = stdout_bytes.decode('utf-8', errors='replace')
+                try:
+                    stderr = stderr_bytes.decode('gbk', errors='replace')
+                except:
+                    stderr = stderr_bytes.decode('utf-8', errors='replace')
+            else:
+                stdout = stdout_bytes.decode('utf-8', errors='replace') if stdout_bytes else ""
+                stderr = stderr_bytes.decode('utf-8', errors='replace') if stderr_bytes else ""
         except asyncio.TimeoutError:
             proc.kill()
             await proc.wait()

@@ -1,9 +1,13 @@
+import sys
+import os
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
 import argparse
 import asyncio
 import contextlib
 import logging
-import os
-import sys
 from typing import AsyncIterator, Sequence
 
 from mcp.server import Server
@@ -54,7 +58,8 @@ async def serve_sse(host: str, port: int):
         ]
     )
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    # 新增 log_config=None
+    config = uvicorn.Config(app, host=host, port=port, log_level="info", use_colors=False, log_config=None)
     http_server = uvicorn.Server(config)
     logger.info(f"SSE server listening on http://{host}:{port}/sse")
     await http_server.serve()
@@ -87,7 +92,8 @@ async def serve_streamable_http(host: str, port: int):
         ],
     )
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
+    # 新增 log_config=None
+    config = uvicorn.Config(app, host=host, port=port, log_level="info", use_colors=False, log_config=None)
     http_server = uvicorn.Server(config)
     logger.info(f"Streamable HTTP server listening on http://{host}:{port}/mcp")
     await http_server.serve()
@@ -108,8 +114,8 @@ def main():
     parser.add_argument(
         "--transport",
         choices=["stdio", "sse", "streamable-http"],
-        default="stdio",
-        help="Transport method (default: stdio)",
+        default="streamable-http",  # ✅ 只改了这一行！原来的stdio改成这个
+        help="Transport method (default: streamable-http)",
     )
     parser.add_argument(
         "--host",
