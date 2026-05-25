@@ -84,7 +84,6 @@ async def serve_streamable_http(host: str, port: int):
         app=server,
         json_response=True,
         stateless=False,
-        request_timeout=300,
     )
 
     @contextlib.asynccontextmanager
